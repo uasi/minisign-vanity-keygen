@@ -1,0 +1,6 @@
+minisign-vanity-keygen
+
+*.key
+*.pub
+
+*.minisig
