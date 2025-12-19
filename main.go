@@ -70,7 +70,7 @@ func main() {
 	numWorkers := runtime.NumCPU()
 	var wg sync.WaitGroup
 
-	for i := 0; i < numWorkers; i++ {
+	for range numWorkers {
 		wg.Add(1)
 		go worker(ctx, &wg, regexps, resultChan, &totalCount)
 	}
