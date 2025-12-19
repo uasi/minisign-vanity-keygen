@@ -11,7 +11,7 @@ go build
 ## Usage
 
 ```bash
-./minisign-vanity-keygen [-alphanumeric] [-overwrite] <regexp>
+./minisign-vanity-keygen [-overwrite] <regexp> [<regexp> ...]
 ```
 
 The tool generates two files in the current directory:
@@ -27,8 +27,7 @@ minisign -C -s minisign.key
 
 ### Options
 
-- `<regexp>` - A [Go regular expression](https://pkg.go.dev/regexp/syntax) to match against the public key.
-- `-alphanumeric` - Exclude keys that contain symbols (`+`, `/`, and `=`) when Base64-encoded.
+- `<regexp>` - One or more [Go regular expressions](https://pkg.go.dev/regexp/syntax) that must all match the public key.
 - `-overwrite` - Overwrite existing `./minisign.key` and `./minisign.pub` files.
 
 ## Examples
@@ -36,13 +35,13 @@ minisign -C -s minisign.key
 Generate a key starting with "RWRmini" (note that minisign public keys always start with "RWQ", "RWR", "RWS", or "RWT"):
 
 ```bash
-./minisign-vanity-keygen "^RWRmini"
+./minisign-vanity-keygen '^RWRmini'
 ```
 
-Generate an alphanumeric-only key containing "sign" or "key":
+Generate a key containing either "sign" or "key", with alphanumeric characters only:
 
 ```bash
-./minisign-vanity-keygen -alphanumeric "sign|key"
+./minisign-vanity-keygen 'sign|key' '^[A-Za-z0-9]+$'
 ```
 
 ## Notes

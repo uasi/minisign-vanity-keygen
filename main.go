@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode"
 
 	"aead.dev/minisign"
 )
@@ -29,21 +28,24 @@ type result struct {
 }
 
 func main() {
-	alphanumeric := flag.Bool("alphanumeric", false, "exclude symbols ('+', '/', and '=')")
 	overwrite := flag.Bool("overwrite", false, "overwrite existing ./minisign.key and ./minisign.pub files")
 	flag.Parse()
 
 	args := flag.Args()
-	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "usage: %s [-alphanumeric] [-overwrite] <regexp>\n", filepath.Base(os.Args[0]))
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "usage: %s [-overwrite] <regexp> [<regexp> ...]\n", filepath.Base(os.Args[0]))
 		os.Exit(1)
 	}
 
-	pattern := args[0]
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: invalid regexp: %v\n", err)
-		os.Exit(1)
+	patterns := args
+	regexps := make([]*regexp.Regexp, len(patterns))
+	for i, pattern := range patterns {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid regexp: %v\n", err)
+			os.Exit(1)
+		}
+		regexps[i] = re
 	}
 
 	if !*overwrite {
@@ -70,7 +72,7 @@ func main() {
 
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go worker(ctx, &wg, re, *alphanumeric, resultChan, &totalCount)
+		go worker(ctx, &wg, regexps, resultChan, &totalCount)
 	}
 
 	go progressReporter(ctx, &totalCount, start)
@@ -113,7 +115,7 @@ func main() {
 	fmt.Println("  minisign -C -s minisign.key")
 }
 
-func worker(ctx context.Context, wg *sync.WaitGroup, re *regexp.Regexp, alphanumeric bool, resultChan chan result, totalCount *uint64) {
+func worker(ctx context.Context, wg *sync.WaitGroup, regexps []*regexp.Regexp, resultChan chan result, totalCount *uint64) {
 	defer wg.Done()
 
 	for {
@@ -133,11 +135,15 @@ func worker(ctx context.Context, wg *sync.WaitGroup, re *regexp.Regexp, alphanum
 
 		pkStr := pk.String()
 
-		if alphanumeric && !isAlphanumeric(pkStr) {
-			continue
+		matchAll := true
+		for _, re := range regexps {
+			if !re.MatchString(pkStr) {
+				matchAll = false
+				break
+			}
 		}
 
-		if re.MatchString(pkStr) {
+		if matchAll {
 			select {
 			case resultChan <- result{pk, sk, atomic.LoadUint64(totalCount)}:
 			case <-ctx.Done():
@@ -161,13 +167,4 @@ func progressReporter(ctx context.Context, totalCount *uint64, start time.Time) 
 			fmt.Printf("%sGenerated %d keys in %v...%s\n", gray, count, time.Since(start).Truncate(time.Second), reset)
 		}
 	}
-}
-
-func isAlphanumeric(s string) bool {
-	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
 }
